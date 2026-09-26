@@ -1,0 +1,7 @@
+@page "/teacher/dashboard"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Teacher")]
+
+<PageTitle>Panel nauczyciela</PageTitle>
+<h1>Panel nauczyciela</h1>
+<p>W tym miejscu znajdzie się podsumowanie danych nauczyciela.</p>

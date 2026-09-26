@@ -1,10 +1,12 @@
 using Microsoft.AspNetCore.Identity;
+using wirtualny_dziekanat.Data.Entities;
 
 namespace wirtualny_dziekanat.Data
 {
-    // Add profile data for application users by adding properties to the ApplicationUser class
     public class ApplicationUser : IdentityUser
     {
+        public Student? Student { get; set; }
+        public Teacher? Teacher { get; set; }
     }
 
 }
