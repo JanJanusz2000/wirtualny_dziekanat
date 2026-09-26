@@ -6,8 +6,27 @@
     </div>
 
     <main>
-        <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+        <div class="top-row px-4 auth">
+            <AuthorizeView Context="authContext">
+                <Authorized>
+                    <span class="text-muted me-3">
+                        Witaj, <strong>@authContext.User.Identity?.Name</strong>
+                    </span>
+                    <form action="/Account/Logout" method="post" class="d-inline">
+                        <AntiforgeryToken />
+                        @* Endpoint Identity akceptuje wyłącznie lokalną ścieżkę powrotu. *@
+                        <input type="hidden" name="ReturnUrl" value="/" />
+                        <button type="submit" class="btn btn-outline-primary btn-sm">
+                            Wyloguj
+                        </button>
+                    </form>
+                </Authorized>
+                <NotAuthorized>
+                    <a class="btn btn-primary btn-sm" href="Account/Login">
+                        Zaloguj się
+                    </a>
+                </NotAuthorized>
+            </AuthorizeView>
         </div>
 
         <article class="content px-4">

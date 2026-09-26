@@ -1,7 +1,180 @@
 @page "/teacher/wystaw-ocene"
+@using System.Security.Claims
 @using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using wirtualny_dziekanat.Services
 @attribute [Authorize(Roles = "Teacher")]
+@rendermode InteractiveServer
+
+@inject ITeacherService TeacherService
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
 <PageTitle>Wystaw ocenę</PageTitle>
-<h1>Wystaw ocenę</h1>
-<p>W tym miejscu znajdzie się formularz wystawiania ocen.</p>
+
+<div class="mb-4">
+    <p class="text-primary text-uppercase fw-semibold mb-1">Panel nauczyciela</p>
+    <h1 class="display-6 fw-bold mb-1">Wystawianie ocen</h1>
+    <p class="text-muted mb-0">Wybierz przedmiot, aby wyświetlić zapisanych studentów.</p>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+}
+
+@if (!string.IsNullOrWhiteSpace(successMessage))
+{
+    <div class="alert alert-success" role="alert">@successMessage</div>
+}
+
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <label for="subject" class="form-label fw-semibold">Przedmiot</label>
+        <select id="subject" class="form-select" value="@selectedSubjectId" @onchange="SubjectChanged" disabled="@isLoadingSubjects">
+            <option value="0">-- wybierz przedmiot --</option>
+            @foreach (var subject in subjects)
+            {
+                <option value="@subject.Id">@subject.Nazwa</option>
+            }
+        </select>
+    </div>
+</div>
+
+@if (isLoadingStudents)
+{
+    <div class="card border-0 shadow-sm"><div class="card-body text-muted">Ładowanie studentów...</div></div>
+}
+else if (selectedSubjectId > 0)
+{
+    <div class="card border-0 shadow-sm">
+        <div class="card-body">
+            <h2 class="h5 mb-4">Studenci zapisani na przedmiot</h2>
+            @if (students.Count == 0)
+            {
+                <p class="text-muted mb-0">Na wybrany przedmiot nie zapisano jeszcze żadnych studentów.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover align-middle mb-0">
+                        <thead><tr><th>Imię</th><th>Nazwisko</th><th>Indeks</th><th>Ocena</th></tr></thead>
+                        <tbody>
+                            @foreach (var student in students)
+                            {
+                                <tr @key="student.EnrollmentId">
+                                    <td>@student.Imie</td>
+                                    <td>@student.Nazwisko</td>
+                                    <td>@student.NumerIndeksu</td>
+                                    <td>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <InputNumber class="form-control form-control-sm grade-input" @bind-Value="student.WartoscOceny" step="0.5" min="2" max="5" />
+                                            <button type="button" class="btn btn-sm btn-primary" disabled="@(savingEnrollmentId is not null)" @onclick="() => SaveGradeAsync(student)">
+                                                @(savingEnrollmentId == student.EnrollmentId ? "Zapisywanie..." : "Zapisz")
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+}
+else if (!isLoadingSubjects && subjects.Count == 0)
+{
+    <div class="alert alert-info">Nie masz jeszcze przypisanych żadnych przedmiotów.</div>
+}
+
+<style>
+    .grade-input { max-width: 90px; }
+</style>
+
+@code {
+    private List<TeacherSubjectDto> subjects = [];
+    private List<StudentGradeDto> students = [];
+    private int selectedSubjectId;
+    private int? savingEnrollmentId;
+    private bool isLoadingSubjects = true;
+    private bool isLoadingStudents;
+    private string? errorMessage;
+    private string? successMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var userId = authenticationState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                errorMessage = "Nie można ustalić tożsamości zalogowanego nauczyciela.";
+                return;
+            }
+
+            subjects = (await TeacherService.GetTeacherSubjectsAsync(userId)).ToList();
+        }
+        catch (Exception exception)
+        {
+            errorMessage = GetErrorMessage(exception, "Nie udało się pobrać listy przedmiotów.");
+        }
+        finally
+        {
+            isLoadingSubjects = false;
+        }
+    }
+
+    private async Task SubjectChanged(ChangeEventArgs args)
+    {
+        errorMessage = null;
+        successMessage = null;
+        students = [];
+        selectedSubjectId = int.TryParse(args.Value?.ToString(), out var subjectId) ? subjectId : 0;
+        if (selectedSubjectId <= 0) return;
+
+        isLoadingStudents = true;
+        try
+        {
+            students = (await TeacherService.GetStudentsForSubjectAsync(selectedSubjectId)).ToList();
+        }
+        catch (Exception exception)
+        {
+            errorMessage = GetErrorMessage(exception, "Nie udało się pobrać studentów dla wybranego przedmiotu.");
+        }
+        finally
+        {
+            isLoadingStudents = false;
+        }
+    }
+
+    private async Task SaveGradeAsync(StudentGradeDto student)
+    {
+        errorMessage = null;
+        successMessage = null;
+        if (student.WartoscOceny is null)
+        {
+            errorMessage = $"Podaj ocenę dla studenta {student.Imie} {student.Nazwisko}.";
+            return;
+        }
+
+        savingEnrollmentId = student.EnrollmentId;
+        try
+        {
+            await TeacherService.SaveGradeAsync(student.EnrollmentId, student.WartoscOceny.Value);
+            successMessage = $"Ocena studenta {student.Imie} {student.Nazwisko} została zapisana.";
+            students = (await TeacherService.GetStudentsForSubjectAsync(selectedSubjectId)).ToList();
+        }
+        catch (Exception exception)
+        {
+            errorMessage = GetErrorMessage(exception, "Nie udało się zapisać oceny.");
+        }
+        finally
+        {
+            savingEnrollmentId = null;
+        }
+    }
+
+    private static string GetErrorMessage(Exception exception, string fallback) =>
+        exception is ArgumentOutOfRangeException or InvalidOperationException ? exception.Message : fallback;
+}

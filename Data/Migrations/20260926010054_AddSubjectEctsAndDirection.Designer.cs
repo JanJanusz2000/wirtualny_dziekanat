@@ -3,17 +3,20 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using wirtualny_dziekanat.Data;
 
 #nullable disable
 
-namespace wirtualny_dziekanat.Migrations
+namespace wirtualny_dziekanat.Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260926010054_AddSubjectEctsAndDirection")]
+    partial class AddSubjectEctsAndDirection
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -380,9 +383,6 @@ namespace wirtualny_dziekanat.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<int>("AktualnySemestr")
-                        .HasColumnType("int");
-
                     b.Property<string>("ApplicationUserId")
                         .IsRequired()
                         .HasColumnType("nvarchar(450)");
@@ -455,9 +455,6 @@ namespace wirtualny_dziekanat.Migrations
                         .HasColumnType("nvarchar(200)");
 
                     b.Property<int>("PunktyECTS")
-                        .HasColumnType("int");
-
-                    b.Property<int>("Semestr")
                         .HasColumnType("int");
 
                     b.Property<int>("TeacherId")

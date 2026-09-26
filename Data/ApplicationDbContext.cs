@@ -35,6 +35,8 @@ namespace wirtualny_dziekanat.Data
             builder.Entity<Student>().HasIndex(student => student.ApplicationUserId).IsUnique();
             builder.Entity<Teacher>().HasIndex(teacher => teacher.ApplicationUserId).IsUnique();
             builder.Entity<Student>().HasIndex(student => student.NumerIndeksu).IsUnique();
+            builder.Entity<Student>().Property(student => student.TrybStudiow).HasDefaultValue("Dzienne");
+            builder.Entity<Student>().Property(student => student.CzyCzesneOplacone).HasDefaultValue(false);
 
             builder.Entity<Grupa>()
                 .HasOne(group => group.Kierunek)
@@ -58,6 +60,12 @@ namespace wirtualny_dziekanat.Data
                 .HasOne(subject => subject.Teacher)
                 .WithMany(teacher => teacher.Subjects)
                 .HasForeignKey(subject => subject.TeacherId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<Subject>()
+                .HasOne(subject => subject.Kierunek)
+                .WithMany()
+                .HasForeignKey(subject => subject.KierunekId)
                 .OnDelete(DeleteBehavior.Restrict);
 
             builder.Entity<Enrollment>()

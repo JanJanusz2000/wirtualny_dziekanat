@@ -1,7 +1,274 @@
-﻿@page "/"
+@page "/"
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
+@using wirtualny_dziekanat.Services
+@rendermode InteractiveServer
 
-<PageTitle>Home</PageTitle>
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IAdminService AdminService
+@inject ITeacherService TeacherService
+@inject IStudentService StudentService
 
-<h1>Hello, world!</h1>
+<PageTitle>Dashboard | Wirtualny Dziekanat</PageTitle>
 
-Welcome to your new app.
+@if (isLoading)
+{
+    <div class="d-flex justify-content-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Ładowanie...</span>
+        </div>
+    </div>
+}
+else if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+}
+
+<AuthorizeView Roles="Admin" Context="adminUser">
+    <Authorized>
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <p class="text-primary text-uppercase fw-semibold mb-1">Wirtualny Dziekanat</p>
+                <h1 class="display-6 fw-bold mb-0">Panel Administratora</h1>
+            </div>
+            <span class="badge bg-primary rounded-pill px-3 py-2">Administrator</span>
+        </div>
+
+        @if (adminStats is not null)
+        {
+            <div class="row g-4 mb-4">
+                <div class="col-md-4">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body">
+                            <p class="text-muted mb-2">Liczba studentów</p>
+                            <p class="display-5 fw-bold text-primary mb-0">@adminStats.StudentCount</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body">
+                            <p class="text-muted mb-2">Liczba nauczycieli</p>
+                            <p class="display-5 fw-bold text-success mb-0">@adminStats.TeacherCount</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body">
+                            <p class="text-muted mb-2">Liczba kierunków</p>
+                            <p class="display-5 fw-bold text-info mb-0">@adminStats.KierunekCount</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <h2 class="h5 mb-3">Szybkie akcje</h2>
+                <div class="d-flex flex-wrap gap-2">
+                    <a class="btn btn-primary" href="admin/kierunki">Zarządzaj Kierunkami</a>
+                    <a class="btn btn-outline-primary" href="admin/studenci">Zarządzaj Studentami</a>
+                    <a class="btn btn-outline-primary" href="admin/przedmioty">Zarządzaj Przedmiotami</a>
+                </div>
+            </div>
+        </div>
+    </Authorized>
+</AuthorizeView>
+
+<AuthorizeView Roles="Teacher" Context="teacherUser">
+    <Authorized>
+        <div class="mb-4">
+            <p class="text-primary text-uppercase fw-semibold mb-1">Wirtualny Dziekanat</p>
+            <h1 class="display-6 fw-bold">Panel Wykładowcy</h1>
+            <p class="text-muted">Twoje prowadzone przedmioty i przypisane grupy.</p>
+        </div>
+
+        @if (teacherSubjects.Count == 0)
+        {
+            <div class="alert alert-info">Nie masz jeszcze przypisanych przedmiotów.</div>
+        }
+        else
+        {
+            <div class="row g-4">
+                @foreach (var subject in teacherSubjects)
+                {
+                    <div class="col-md-6 col-xl-4">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-body d-flex flex-column">
+                                <h2 class="h5">@subject.SubjectName</h2>
+                                <p class="text-muted mb-4">
+                                    <strong>Grupy:</strong>
+                                    @(subject.GroupNames.Count > 0
+                                        ? string.Join(", ", subject.GroupNames)
+                                        : "brak przypisanych grup")
+                                </p>
+                                <a class="btn btn-primary mt-auto"
+                                   href="teacher/wystaw-ocene?subjectId=@subject.SubjectId">
+                                    Wystaw oceny
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </Authorized>
+</AuthorizeView>
+
+<AuthorizeView Roles="Student" Context="studentUser">
+    <Authorized>
+        <div class="mb-4">
+            <p class="text-primary text-uppercase fw-semibold mb-1">Wirtualny Dziekanat</p>
+            <h1 class="display-6 fw-bold">Twój Wirtualny Dziekanat</h1>
+            <p class="text-muted">Najważniejsze informacje o Twoich studiach w jednym miejscu.</p>
+        </div>
+
+        @if (studentInfo is null)
+        {
+            <div class="alert alert-warning">Nie znaleziono profilu studenta dla tego konta.</div>
+        }
+        else
+        {
+            <div class="row g-4">
+                <div class="col-lg-6">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body">
+                            <h2 class="h5 mb-4">Dane administracyjne</h2>
+                            <dl class="row mb-0">
+                                <dt class="col-sm-4">Student</dt>
+                                <dd class="col-sm-8">@studentInfo.Imie @studentInfo.Nazwisko</dd>
+                                <dt class="col-sm-4">Kierunek</dt>
+                                <dd class="col-sm-8">@studentInfo.KierunekNazwa</dd>
+                                <dt class="col-sm-4">Tryb</dt>
+                                <dd class="col-sm-8">@studentInfo.TrybStudiow</dd>
+                                <dt class="col-sm-4">Semestr</dt>
+                                <dd class="col-sm-8">@studentInfo.AktualnySemestr</dd>
+                            </dl>
+
+                            @if (studentInfo.CzyCzesneOplacone)
+                            {
+                                <div class="alert alert-success mb-0 mt-4">
+                                    <span class="bi bi-check-circle me-2" aria-hidden="true"></span>
+                                    Czesne opłacone
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="alert alert-danger mb-0 mt-4">
+                                    <span class="bi bi-exclamation-triangle me-2" aria-hidden="true"></span>
+                                    <div>Zaległość w opłatach</div>
+                                    <button class="btn btn-success mt-2" @onclick="OplacCzesne" disabled="@isPayingTuition">
+                                        @(isPayingTuition ? "Przetwarzanie..." : "Opłać czesne (Symulacja)")
+                                    </button>
+                                </div>
+                            }
+
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6">
+                    <a class="card border-0 shadow-sm h-100 text-decoration-none" href="student/oceny">
+                        <div class="card-body d-flex flex-column justify-content-center text-center">
+                            <span class="bi bi-list-nested fs-1 text-primary mb-3" aria-hidden="true"></span>
+                            <h2 class="h5 text-dark">Przeglądaj moje oceny</h2>
+                        </div>
+                    </a>
+                </div>
+            </div>
+        }
+    </Authorized>
+</AuthorizeView>
+
+<AuthorizeView Context="guestUser">
+    <NotAuthorized>
+        <section class="p-5 mb-4 bg-primary text-white rounded-3 shadow-sm">
+            <div class="container-fluid py-4">
+                <p class="text-uppercase fw-semibold mb-2">Wirtualny Dziekanat</p>
+                <h1 class="display-5 fw-bold">Witamy w Wirtualnym Dziekanacie</h1>
+                <p class="lead col-lg-8 mb-4">
+                    Zaloguj się, aby sprawdzić oceny, plan zajęć i informacje dotyczące studiów.
+                </p>
+                <a class="btn btn-light btn-lg" href="Account/Login">Zaloguj się do systemu</a>
+            </div>
+        </section>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private AdminSystemStats? adminStats;
+    private IReadOnlyList<TeacherDashboardInfo> teacherSubjects = [];
+    private StudentDashboardInfo? studentInfo;
+    private string? studentUserId;
+    private bool isLoading = true;
+    private bool isPayingTuition;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authenticationState.User;
+            var userId = user.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                return;
+            }
+
+            studentUserId = userId;
+
+            if (user.IsInRole("Admin"))
+            {
+                adminStats = await AdminService.GetSystemStatsAsync();
+            }
+            else if (user.IsInRole("Teacher"))
+            {
+                teacherSubjects = await TeacherService.GetTeacherDashboardInfoAsync(userId);
+            }
+            else if (user.IsInRole("Student"))
+            {
+                studentInfo = await StudentService.GetStudentDashboardInfoAsync(userId);
+            }
+
+        }
+        catch (Exception)
+        {
+            errorMessage = "Nie udało się załadować danych dashboardu.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task OplacCzesne()
+    {
+        if (string.IsNullOrWhiteSpace(studentUserId))
+        {
+            errorMessage = "Nie można ustalić tożsamości studenta.";
+            return;
+        }
+
+        isPayingTuition = true;
+        errorMessage = null;
+
+        try
+        {
+            await StudentService.PayTuitionAsync(studentUserId);
+            studentInfo = await StudentService.GetStudentDashboardInfoAsync(studentUserId);
+            StateHasChanged();
+        }
+        catch (Exception)
+        {
+            errorMessage = "Nie udało się zarejestrować opłaty.";
+        }
+        finally
+        {
+            isPayingTuition = false;
+        }
+    }
+
+}

@@ -1,7 +1,213 @@
 @page "/admin/przedmioty"
 @using Microsoft.AspNetCore.Authorization
+@using wirtualny_dziekanat.Data.Entities
+@using wirtualny_dziekanat.Services
 @attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+
+@inject IAdminService AdminService
 
 <PageTitle>Przedmioty</PageTitle>
-<h1>Przedmioty</h1>
-<p>W tym miejscu znajdzie się zarządzanie przedmiotami.</p>
+
+<div class="mb-4">
+    <p class="text-primary text-uppercase fw-semibold mb-1">Administracja</p>
+    <h1 class="display-6 fw-bold mb-1">Przedmioty</h1>
+    <p class="text-muted mb-0">Zarządzaj przedmiotami, punktami ECTS, kierunkami i prowadzącymi.</p>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+}
+
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <h2 class="h5 mb-4">Dodaj przedmiot</h2>
+
+        <EditForm Model="newSubject" OnValidSubmit="AddSubjectAsync">
+            <DataAnnotationsValidator />
+            <ValidationSummary class="text-danger" />
+
+            <div class="row g-3 align-items-end">
+                <div class="col-lg-4">
+                    <label for="subjectName" class="form-label">Nazwa przedmiotu</label>
+                    <InputText id="subjectName"
+                               class="form-control"
+                               @bind-Value="newSubject.Nazwa"
+                               placeholder="np. Algorytmy" />
+                    <ValidationMessage For="@(() => newSubject.Nazwa)" class="text-danger" />
+                </div>
+                <div class="col-md-3 col-lg-2">
+                    <label for="ects" class="form-label">Punkty ECTS</label>
+                    <InputNumber id="ects" class="form-control" @bind-Value="newSubject.PunktyECTS" />
+                    <ValidationMessage For="@(() => newSubject.PunktyECTS)" class="text-danger" />
+                </div>
+                <div class="col-md-3 col-lg-2">
+                    <label for="semester" class="form-label">Semestr</label>
+                    <InputNumber id="semester" class="form-control" @bind-Value="newSubject.Semestr" />
+                    <ValidationMessage For="@(() => newSubject.Semestr)" class="text-danger" />
+                </div>
+                <div class="col-md-5 col-lg-3">
+                    <label for="direction" class="form-label">Kierunek</label>
+                    <InputSelect id="direction" class="form-select" @bind-Value="newSubject.KierunekId">
+                        <option value="0">-- wybierz kierunek --</option>
+                        @foreach (var direction in directions)
+                        {
+                            <option value="@direction.Id">@direction.Nazwa</option>
+                        }
+                    </InputSelect>
+                    <ValidationMessage For="@(() => newSubject.KierunekId)" class="text-danger" />
+                </div>
+                <div class="col-md-5 col-lg-3">
+                    <label for="teacher" class="form-label">Wykładowca</label>
+                    <InputSelect id="teacher" class="form-select" @bind-Value="newSubject.TeacherId">
+                        <option value="0">-- wybierz wykładowcę --</option>
+                        @foreach (var teacher in teachers)
+                        {
+                            <option value="@teacher.Id">@teacher.Imie @teacher.Nazwisko</option>
+                        }
+                    </InputSelect>
+                    <ValidationMessage For="@(() => newSubject.TeacherId)" class="text-danger" />
+                </div>
+                <div class="col-md-2 col-lg-12">
+                    <button type="submit" class="btn btn-primary" disabled="@isSaving">
+                        @(isSaving ? "Zapisywanie..." : "Dodaj przedmiot")
+                    </button>
+                </div>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-body">
+        <h2 class="h5 mb-4">Lista przedmiotów</h2>
+
+        @if (isLoading)
+        {
+            <p class="text-muted mb-0">Ładowanie przedmiotów...</p>
+        }
+        else if (subjects.Count == 0)
+        {
+            <p class="text-muted mb-0">Nie dodano jeszcze żadnego przedmiotu.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-striped table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Nazwa Przedmiotu</th>
+                            <th>ECTS</th>
+                            <th>Semestr</th>
+                            <th>Kierunek</th>
+                            <th>Prowadzący</th>
+                            <th class="text-end">Akcje</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var subject in subjects)
+                        {
+                            <tr @key="subject.Id">
+                                <td>@subject.Nazwa</td>
+                                <td>@subject.PunktyECTS</td>
+                                <td>@subject.Semestr</td>
+                                <td>@subject.Kierunek?.Nazwa</td>
+                                <td>@subject.Teacher?.Imie @subject.Teacher?.Nazwisko</td>
+                                <td class="text-end">
+                                    <button type="button"
+                                            class="btn btn-sm btn-danger"
+                                            disabled="@(deletingId is not null)"
+                                            @onclick="() => DeleteSubjectAsync(subject.Id)">
+                                        <span class="bi bi-trash me-1" aria-hidden="true"></span>
+                                        Usuń
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private List<Teacher> teachers = [];
+    private List<Kierunek> directions = [];
+    private List<Subject> subjects = [];
+    private Subject newSubject = CreateNewSubject();
+    private bool isLoading = true;
+    private bool isSaving;
+    private int? deletingId;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            teachers = await AdminService.GetAllTeachersAsync();
+            directions = await AdminService.GetAllKierunkiAsync();
+            subjects = await AdminService.GetAllSubjectsAsync();
+        }
+        catch (Exception)
+        {
+            errorMessage = "Nie udało się załadować danych przedmiotów.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task AddSubjectAsync()
+    {
+        isSaving = true;
+        errorMessage = null;
+
+        try
+        {
+            await AdminService.AddSubjectAsync(newSubject);
+            newSubject = CreateNewSubject();
+            subjects = await AdminService.GetAllSubjectsAsync();
+        }
+        catch (Exception)
+        {
+            errorMessage = "Nie udało się dodać przedmiotu. Sprawdź wybrane dane.";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task DeleteSubjectAsync(int id)
+    {
+        deletingId = id;
+        errorMessage = null;
+
+        try
+        {
+            await AdminService.DeleteSubjectAsync(id);
+            subjects = await AdminService.GetAllSubjectsAsync();
+        }
+        catch (Exception)
+        {
+            errorMessage = "Nie udało się usunąć przedmiotu. Może być używany w zapisach lub planie zajęć.";
+        }
+        finally
+        {
+            deletingId = null;
+        }
+    }
+
+    private static Subject CreateNewSubject() => new() { PunktyECTS = 5, Semestr = 1 };
+}

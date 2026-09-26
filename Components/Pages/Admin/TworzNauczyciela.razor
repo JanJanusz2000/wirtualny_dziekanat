@@ -1,0 +1,95 @@
+@page "/admin/tworz-nauczyciela"
+@using Microsoft.AspNetCore.Authorization
+@using wirtualny_dziekanat.Services
+@attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+
+@inject IAdminService AdminService
+
+<PageTitle>Utwórz nauczyciela</PageTitle>
+
+<div class="row justify-content-center">
+    <div class="col-lg-7 col-xl-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4 p-lg-5">
+                <p class="text-primary text-uppercase fw-semibold mb-1">Administracja</p>
+                <h1 class="h3 mb-2">Utwórz konto nauczyciela</h1>
+                <p class="text-muted mb-4">
+                    Konto otrzyma adres w formacie imie.nazwisko@uczelnia.pl.
+                </p>
+
+                @if (!string.IsNullOrWhiteSpace(errorMessage))
+                {
+                    <div class="alert alert-danger" role="alert">@errorMessage</div>
+                }
+
+                @if (createdTeacher is not null)
+                {
+                    <div class="alert alert-success" role="alert">
+                        <h2 class="h5">Nauczyciel został utworzony</h2>
+                        <p class="mb-2">Przekaż nauczycielowi poniższe dane logowania:</p>
+                        <dl class="row mb-0">
+                            <dt class="col-sm-4">Login</dt>
+                            <dd class="col-sm-8"><code>@createdTeacher.Email</code></dd>
+                            <dt class="col-sm-4">Hasło tymczasowe</dt>
+                            <dd class="col-sm-8"><code>@createdTeacher.TemporaryPassword</code></dd>
+                        </dl>
+                    </div>
+                }
+
+                <EditForm Model="request" OnValidSubmit="CreateTeacherAsync">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary class="text-danger" />
+
+                    <div class="mb-3">
+                        <label for="teacherFirstName" class="form-label">Imię</label>
+                        <InputText id="teacherFirstName" class="form-control" @bind-Value="request.Imie" />
+                        <ValidationMessage For="@(() => request.Imie)" class="text-danger" />
+                    </div>
+                    <div class="mb-3">
+                        <label for="teacherLastName" class="form-label">Nazwisko</label>
+                        <InputText id="teacherLastName" class="form-control" @bind-Value="request.Nazwisko" />
+                        <ValidationMessage For="@(() => request.Nazwisko)" class="text-danger" />
+                    </div>
+                    <div class="mb-4">
+                        <label for="academicTitle" class="form-label">Tytuł naukowy</label>
+                        <InputText id="academicTitle" class="form-control" @bind-Value="request.TytulNaukowy" placeholder="np. dr" />
+                        <ValidationMessage For="@(() => request.TytulNaukowy)" class="text-danger" />
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" disabled="@isSaving">
+                        @(isSaving ? "Tworzenie konta..." : "Utwórz nauczyciela")
+                    </button>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private CreateTeacherRequest request = new();
+    private CreatedTeacherResult? createdTeacher;
+    private string? errorMessage;
+    private bool isSaving;
+
+    private async Task CreateTeacherAsync()
+    {
+        isSaving = true;
+        errorMessage = null;
+        createdTeacher = null;
+
+        try
+        {
+            createdTeacher = await AdminService.CreateTeacherAsync(request);
+            request = new CreateTeacherRequest();
+        }
+        catch (Exception)
+        {
+            errorMessage = "Nie udało się utworzyć konta nauczyciela. Sprawdź, czy konto o takim adresie jeszcze nie istnieje.";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}

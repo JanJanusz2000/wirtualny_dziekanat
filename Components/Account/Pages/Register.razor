@@ -1,61 +1,97 @@
-﻿@page "/Account/Register"
+@page "/Account/Register"
 
 @using System.ComponentModel.DataAnnotations
-@using System.Text
-@using System.Text.Encodings.Web
+@using System.Globalization
 @using Microsoft.AspNetCore.Identity
-@using Microsoft.AspNetCore.WebUtilities
+@using Microsoft.EntityFrameworkCore
 @using wirtualny_dziekanat.Data
+@using wirtualny_dziekanat.Data.Entities
+@using wirtualny_dziekanat.Services
 
 @inject UserManager<ApplicationUser> UserManager
-@inject IUserStore<ApplicationUser> UserStore
+@inject RoleManager<IdentityRole> RoleManager
 @inject SignInManager<ApplicationUser> SignInManager
-@inject IEmailSender<ApplicationUser> EmailSender
-@inject ILogger<Register> Logger
-@inject NavigationManager NavigationManager
+@inject IDbContextFactory<ApplicationDbContext> ContextFactory
 @inject IdentityRedirectManager RedirectManager
+@inject IAdminService AdminService
 
-<PageTitle>Register</PageTitle>
+<PageTitle>Zapis na studia</PageTitle>
 
-<h1>Register</h1>
+<div class="row justify-content-center">
+    <div class="col-lg-7 col-xl-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4 p-lg-5">
+                <p class="text-primary text-uppercase fw-semibold mb-1">Rekrutacja</p>
+                <h1 class="h3 mb-2">Zapisz się na studia</h1>
+                <p class="text-muted mb-4">
+                    Uzupełnij dane, aby utworzyć konto studenta w Wirtualnym Dziekanacie.
+                </p>
 
-<div class="row">
-    <div class="col-lg-6">
-        <StatusMessage Message="@Message" />
-        <EditForm Model="Input" method="post" OnValidSubmit="RegisterUser" FormName="register">
-            <DataAnnotationsValidator />
-            <h2>Create a new account.</h2>
-            <hr />
-            <ValidationSummary class="text-danger" role="alert" />
-            <div class="form-floating mb-3">
-                <InputText @bind-Value="Input.Email" id="Input.Email" class="form-control" autocomplete="username" aria-required="true" placeholder="name@example.com" />
-                <label for="Input.Email">Email</label>
-                <ValidationMessage For="() => Input.Email" class="text-danger" />
+                @if (!string.IsNullOrWhiteSpace(registrationError))
+                {
+                    <div class="alert alert-danger" role="alert">@registrationError</div>
+                }
+
+                <EditForm Model="Input" method="post" OnValidSubmit="RegisterUser" FormName="register">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary class="text-danger" role="alert" />
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="firstName" class="form-label">Imię</label>
+                            <InputText id="firstName" class="form-control" @bind-Value="Input.Imie" autocomplete="given-name" />
+                            <ValidationMessage For="@(() => Input.Imie)" class="text-danger" />
+                        </div>
+                        <div class="col-md-6">
+                            <label for="lastName" class="form-label">Nazwisko</label>
+                            <InputText id="lastName" class="form-control" @bind-Value="Input.Nazwisko" autocomplete="family-name" />
+                            <ValidationMessage For="@(() => Input.Nazwisko)" class="text-danger" />
+                        </div>
+                        <div class="col-12">
+                            <label for="direction" class="form-label">Kierunek studiów</label>
+                            <InputSelect id="direction" class="form-select" @bind-Value="Input.KierunekId">
+                                <option value="0">-- wybierz kierunek --</option>
+                                @foreach (var direction in directions)
+                                {
+                                    <option value="@direction.Id">@direction.Nazwa</option>
+                                }
+                            </InputSelect>
+                            <ValidationMessage For="@(() => Input.KierunekId)" class="text-danger" />
+                        </div>
+                        <div class="col-12">
+                            <label for="studyMode" class="form-label">Tryb studiów</label>
+                            <InputSelect id="studyMode" class="form-select" @bind-Value="Input.TrybStudiow">
+                                <option value="">-- wybierz tryb --</option>
+                                <option value="Dzienne">Dzienne</option>
+                                <option value="Zaoczne">Zaoczne</option>
+                            </InputSelect>
+                            <ValidationMessage For="@(() => Input.TrybStudiow)" class="text-danger" />
+                        </div>
+                        <div class="col-md-6">
+                            <label for="password" class="form-label">Hasło</label>
+                            <InputText id="password" type="password" class="form-control" @bind-Value="Input.Password" autocomplete="new-password" />
+                            <ValidationMessage For="@(() => Input.Password)" class="text-danger" />
+                        </div>
+                        <div class="col-md-6">
+                            <label for="confirmPassword" class="form-label">Powtórz hasło</label>
+                            <InputText id="confirmPassword" type="password" class="form-control" @bind-Value="Input.ConfirmPassword" autocomplete="new-password" />
+                            <ValidationMessage For="@(() => Input.ConfirmPassword)" class="text-danger" />
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-lg w-100 mt-4" disabled="@isSubmitting">
+                        @(isSubmitting ? "Tworzenie konta..." : "Zarejestruj się")
+                    </button>
+                </EditForm>
             </div>
-            <div class="form-floating mb-3">
-                <InputText type="password" @bind-Value="Input.Password" id="Input.Password" class="form-control" autocomplete="new-password" aria-required="true" placeholder="password" />
-                <label for="Input.Password">Password</label>
-                <ValidationMessage For="() => Input.Password" class="text-danger" />
-            </div>
-            <div class="form-floating mb-3">
-                <InputText type="password" @bind-Value="Input.ConfirmPassword" id="Input.ConfirmPassword" class="form-control" autocomplete="new-password" aria-required="true" placeholder="password" />
-                <label for="Input.ConfirmPassword">Confirm Password</label>
-                <ValidationMessage For="() => Input.ConfirmPassword" class="text-danger" />
-            </div>
-            <button type="submit" class="w-100 btn btn-lg btn-primary">Register</button>
-        </EditForm>
-    </div>
-    <div class="col-lg-4 col-lg-offset-2">
-        <section>
-            <h3>Use another service to register.</h3>
-            <hr />
-            <ExternalLoginPicker />
-        </section>
+        </div>
     </div>
 </div>
 
 @code {
-    private IEnumerable<IdentityError>? identityErrors;
+    private List<Kierunek> directions = [];
+    private bool isSubmitting;
+    private string? registrationError;
 
     [SupplyParameterFromForm]
     private InputModel Input { get; set; } = default!;
@@ -63,90 +99,149 @@
     [SupplyParameterFromQuery]
     private string? ReturnUrl { get; set; }
 
-    private string? Message => identityErrors is null ? null : $"Error: {string.Join(", ", identityErrors.Select(error => error.Description))}";
-
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         Input ??= new();
+
+        await using var context = await ContextFactory.CreateDbContextAsync();
+        directions = await context.Kierunki
+            .AsNoTracking()
+            .OrderBy(direction => direction.Nazwa)
+            .ToListAsync();
     }
 
-    public async Task RegisterUser(EditContext editContext)
+    private async Task RegisterUser()
     {
-        var user = CreateUser();
+        isSubmitting = true;
+        registrationError = null;
 
-        await UserStore.SetUserNameAsync(user, Input.Email, CancellationToken.None);
-        var emailStore = GetEmailStore();
-        await emailStore.SetEmailAsync(user, Input.Email, CancellationToken.None);
-        var result = await UserManager.CreateAsync(user, Input.Password);
-
-        if (!result.Succeeded)
+        try
         {
-            identityErrors = result.Errors;
-            return;
-        }
+            await using var context = await ContextFactory.CreateDbContextAsync();
 
-        Logger.LogInformation("User created a new account with password.");
+            var groupId = await context.Grupy
+                .Where(group => group.KierunekId == Input.KierunekId)
+                .OrderBy(group => group.Id)
+                .Select(group => (int?)group.Id)
+                .FirstOrDefaultAsync();
 
-        var userId = await UserManager.GetUserIdAsync(user);
-        var code = await UserManager.GenerateEmailConfirmationTokenAsync(user);
-        code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
-        var callbackUrl = NavigationManager.GetUriWithQueryParameters(
-            NavigationManager.ToAbsoluteUri("Account/ConfirmEmail").AbsoluteUri,
-            new Dictionary<string, object?> { ["userId"] = userId, ["code"] = code, ["returnUrl"] = ReturnUrl });
+            if (groupId is null)
+            {
+                registrationError = "Wybrany kierunek nie ma jeszcze przypisanej grupy. Skontaktuj się z administratorem.";
+                return;
+            }
 
-        await EmailSender.SendConfirmationLinkAsync(user, Input.Email, HtmlEncoder.Default.Encode(callbackUrl));
+            var indexes = await context.Students
+                .AsNoTracking()
+                .Select(student => student.NumerIndeksu)
+                .ToListAsync();
 
-        if (UserManager.Options.SignIn.RequireConfirmedAccount)
-        {
-            RedirectManager.RedirectTo(
-                "Account/RegisterConfirmation",
-                new() { ["email"] = Input.Email, ["returnUrl"] = ReturnUrl });
-        }
-        else
-        {
+            const int firstIndex = 100000;
+            var highestIndex = indexes
+                .Select(index => int.TryParse(index, out var number) ? number : 0)
+                .DefaultIfEmpty(firstIndex - 1)
+                .Max();
+            var indexNumber = Math.Max(firstIndex, highestIndex + 1);
+            var index = indexNumber.ToString(CultureInfo.InvariantCulture);
+            var email = $"{index}@student.uczelnia.pl";
+
+            var user = new ApplicationUser
+            {
+                UserName = email,
+                Email = email,
+                EmailConfirmed = true
+            };
+
+            var createResult = await UserManager.CreateAsync(user, Input.Password);
+            if (!createResult.Succeeded)
+            {
+                registrationError = FormatIdentityErrors(createResult);
+                return;
+            }
+
+            try
+            {
+                if (!await RoleManager.RoleExistsAsync("Student"))
+                {
+                    var roleResult = await RoleManager.CreateAsync(new IdentityRole("Student"));
+                    if (!roleResult.Succeeded)
+                    {
+                        registrationError = FormatIdentityErrors(roleResult);
+                        await UserManager.DeleteAsync(user);
+                        return;
+                    }
+                }
+
+                var userRoleResult = await UserManager.AddToRoleAsync(user, "Student");
+                if (!userRoleResult.Succeeded)
+                {
+                    registrationError = FormatIdentityErrors(userRoleResult);
+                    await UserManager.DeleteAsync(user);
+                    return;
+                }
+
+                var student = new Student
+                {
+                    ApplicationUserId = user.Id,
+                    NumerIndeksu = index,
+                    Imie = Input.Imie.Trim(),
+                    Nazwisko = Input.Nazwisko.Trim(),
+                    Semestr = 1,
+                    KierunekId = Input.KierunekId,
+                    GrupaId = groupId.Value,
+                    TrybStudiow = Input.TrybStudiow,
+                    CzyCzesneOplacone = false
+                };
+                context.Students.Add(student);
+                await context.SaveChangesAsync();
+                await AdminService.AutoEnrollStudentAsync(student.Id);
+            }
+            catch
+            {
+                await UserManager.DeleteAsync(user);
+                throw;
+            }
+
             await SignInManager.SignInAsync(user, isPersistent: false);
             RedirectManager.RedirectTo(ReturnUrl);
         }
-    }
-
-    private ApplicationUser CreateUser()
-    {
-        try
+        catch (Exception exception)
         {
-            return Activator.CreateInstance<ApplicationUser>();
+            registrationError = $"Nie udało się utworzyć konta: {exception.Message}";
         }
-        catch
+        finally
         {
-            throw new InvalidOperationException($"Can't create an instance of '{nameof(ApplicationUser)}'. " +
-                $"Ensure that '{nameof(ApplicationUser)}' is not an abstract class and has a parameterless constructor.");
+            isSubmitting = false;
         }
     }
 
-    private IUserEmailStore<ApplicationUser> GetEmailStore()
-    {
-        if (!UserManager.SupportsUserEmail)
-        {
-            throw new NotSupportedException("The default UI requires a user store with email support.");
-        }
-        return (IUserEmailStore<ApplicationUser>)UserStore;
-    }
+    private static string FormatIdentityErrors(IdentityResult result) =>
+        string.Join(" ", result.Errors.Select(error => error.Description));
 
     private sealed class InputModel
     {
-        [Required]
-        [EmailAddress]
-        [Display(Name = "Email")]
-        public string Email { get; set; } = "";
+        [Required(ErrorMessage = "Imię jest wymagane.")]
+        [StringLength(100)]
+        public string Imie { get; set; } = string.Empty;
 
-        [Required]
-        [StringLength(100, ErrorMessage = "The {0} must be at least {2} and at max {1} characters long.", MinimumLength = 6)]
-        [DataType(DataType.Password)]
-        [Display(Name = "Password")]
-        public string Password { get; set; } = "";
+        [Required(ErrorMessage = "Nazwisko jest wymagane.")]
+        [StringLength(100)]
+        public string Nazwisko { get; set; } = string.Empty;
 
+        [Range(1, int.MaxValue, ErrorMessage = "Wybierz kierunek studiów.")]
+        public int KierunekId { get; set; }
+
+        [Required(ErrorMessage = "Wybierz tryb studiów.")]
+        [RegularExpression("^(Dzienne|Zaoczne)$", ErrorMessage = "Wybierz poprawny tryb studiów.")]
+        public string TrybStudiow { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Hasło jest wymagane.")]
+        [StringLength(100, MinimumLength = 6, ErrorMessage = "Hasło musi mieć od 6 do 100 znaków.")]
         [DataType(DataType.Password)]
-        [Display(Name = "Confirm password")]
-        [Compare("Password", ErrorMessage = "The password and confirmation password do not match.")]
-        public string ConfirmPassword { get; set; } = "";
+        public string Password { get; set; } = string.Empty;
+
+        [Compare(nameof(Password), ErrorMessage = "Hasła muszą być identyczne.")]
+        [DataType(DataType.Password)]
+        public string ConfirmPassword { get; set; } = string.Empty;
     }
 }

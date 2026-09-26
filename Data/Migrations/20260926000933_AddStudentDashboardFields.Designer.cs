@@ -3,17 +3,20 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using wirtualny_dziekanat.Data;
 
 #nullable disable
 
-namespace wirtualny_dziekanat.Migrations
+namespace wirtualny_dziekanat.Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260926000933_AddStudentDashboardFields")]
+    partial class AddStudentDashboardFields
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -380,9 +383,6 @@ namespace wirtualny_dziekanat.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<int>("AktualnySemestr")
-                        .HasColumnType("int");
-
                     b.Property<string>("ApplicationUserId")
                         .IsRequired()
                         .HasColumnType("nvarchar(450)");
@@ -446,26 +446,15 @@ namespace wirtualny_dziekanat.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<int>("KierunekId")
-                        .HasColumnType("int");
-
                     b.Property<string>("Nazwa")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
-                    b.Property<int>("PunktyECTS")
-                        .HasColumnType("int");
-
-                    b.Property<int>("Semestr")
-                        .HasColumnType("int");
-
                     b.Property<int>("TeacherId")
                         .HasColumnType("int");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("KierunekId");
 
                     b.HasIndex("TeacherId");
 
@@ -698,19 +687,11 @@ namespace wirtualny_dziekanat.Migrations
 
             modelBuilder.Entity("wirtualny_dziekanat.Data.Entities.Subject", b =>
                 {
-                    b.HasOne("wirtualny_dziekanat.Data.Entities.Kierunek", "Kierunek")
-                        .WithMany()
-                        .HasForeignKey("KierunekId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.HasOne("wirtualny_dziekanat.Data.Entities.Teacher", "Teacher")
                         .WithMany("Subjects")
                         .HasForeignKey("TeacherId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.Navigation("Kierunek");
 
                     b.Navigation("Teacher");
                 });

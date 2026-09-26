@@ -21,6 +21,14 @@ public class Student
     [Range(1, 20)]
     public int Semestr { get; set; }
 
+    [Range(1, 20)]
+    public int AktualnySemestr { get; set; } = 1;
+
+    [Required, StringLength(20)]
+    public string TrybStudiow { get; set; } = "Dzienne";
+
+    public bool CzyCzesneOplacone { get; set; }
+
     public int KierunekId { get; set; }
     public int GrupaId { get; set; }
 

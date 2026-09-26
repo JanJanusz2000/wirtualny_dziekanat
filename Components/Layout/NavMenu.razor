@@ -1,92 +1,102 @@
-﻿@implements IDisposable
-
-@inject NavigationManager NavigationManager
-
 <div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
-        <a class="navbar-brand" href="">wirtualny_dziekanat</a>
+        <a class="navbar-brand" href="">Wirtualny Dziekanat</a>
     </div>
 </div>
 
-<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+<input type="checkbox" title="Otwórz menu" class="navbar-toggler" />
 
 <div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
     <nav class="nav flex-column">
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
-            </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="counter">
-                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Counter
-            </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="weather">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Weather
-            </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="auth">
-                <span class="bi bi-lock-nav-menu" aria-hidden="true"></span> Auth Required
+                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span>
+                Strona główna
             </NavLink>
         </div>
 
         <AuthorizeView>
             <Authorized>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="Account/Manage">
-                        <span class="bi bi-person-fill-nav-menu" aria-hidden="true"></span> @context.User.Identity?.Name
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <form action="Account/Logout" method="post">
-                        <AntiforgeryToken />
-                        <input type="hidden" name="ReturnUrl" value="@currentUrl" />
-                        <button type="submit" class="nav-link">
-                            <span class="bi bi-arrow-bar-left-nav-menu" aria-hidden="true"></span> Logout
-                        </button>
-                    </form>
-                </div>
+                <AuthorizeView Roles="Admin" Context="adminContext">
+                    <div class="nav-item px-3 mt-3">
+                        <span class="nav-section-title">Administracja</span>
+                    </div>
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="admin/kierunki">
+                            <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span>
+                            Kierunki
+                        </NavLink>
+                    </div>
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="admin/studenci">
+                            <span class="bi bi-person-nav-menu" aria-hidden="true"></span>
+                            Studenci
+                        </NavLink>
+                    </div>
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="admin/nauczyciele">
+                            <span class="bi bi-person-badge-nav-menu" aria-hidden="true"></span>
+                            Nauczyciele
+                        </NavLink>
+                    </div>
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="admin/przedmioty">
+                            <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span>
+                            Przedmioty
+                        </NavLink>
+                    </div>
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="admin/administratorzy">
+                            <span class="bi bi-shield-lock-nav-menu" aria-hidden="true"></span>
+                            Administratorzy
+                        </NavLink>
+                    </div>
+                </AuthorizeView>
+
+                <AuthorizeView Roles="Teacher" Context="teacherContext">
+                    <div class="nav-item px-3 mt-3">
+                        <span class="nav-section-title">Strefa nauczyciela</span>
+                    </div>
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="teacher/wystaw-ocene">
+                            <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span>
+                            Wystaw Ocenę
+                        </NavLink>
+                    </div>
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="teacher/przedmioty">
+                            <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span>
+                            Moje Przedmioty
+                        </NavLink>
+                    </div>
+                </AuthorizeView>
+
+                <AuthorizeView Roles="Student" Context="studentContext">
+                    <div class="nav-item px-3 mt-3">
+                        <span class="nav-section-title">Strefa studenta</span>
+                    </div>
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="student/oceny">
+                            <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span>
+                            Moje Oceny
+                        </NavLink>
+                    </div>
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="student/zapisy">
+                            <span class="bi bi-journal-plus" aria-hidden="true"></span>
+                            Wybór Przedmiotów
+                        </NavLink>
+                    </div>
+                </AuthorizeView>
             </Authorized>
             <NotAuthorized>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="Account/Register">
-                        <span class="bi bi-person-nav-menu" aria-hidden="true"></span> Register
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
+                <div class="nav-item px-3 mt-3">
                     <NavLink class="nav-link" href="Account/Login">
-                        <span class="bi bi-person-badge-nav-menu" aria-hidden="true"></span> Login
+                        <span class="bi bi-person-badge-nav-menu" aria-hidden="true"></span>
+                        Zaloguj się
                     </NavLink>
                 </div>
             </NotAuthorized>
         </AuthorizeView>
     </nav>
 </div>
-
-@code {
-    private string? currentUrl;
-
-    protected override void OnInitialized()
-    {
-        currentUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
-        NavigationManager.LocationChanged += OnLocationChanged;
-    }
-
-    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
-    {
-        currentUrl = NavigationManager.ToBaseRelativePath(e.Location);
-        StateHasChanged();
-    }
-
-    public void Dispose()
-    {
-        NavigationManager.LocationChanged -= OnLocationChanged;
-    }
-}
-

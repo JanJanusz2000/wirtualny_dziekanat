@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using wirtualny_dziekanat.Components;
 using wirtualny_dziekanat.Components.Account;
 using wirtualny_dziekanat.Data;
+using wirtualny_dziekanat.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -23,9 +24,14 @@ builder.Services.AddAuthentication(options =>
     .AddIdentityCookies();
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
+// Fabryka tworzy krótko żyjący DbContext dla każdej operacji serwisu.
+builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
     options.UseSqlServer(connectionString));
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
+
+builder.Services.AddScoped<IStudentService, StudentService>();
+builder.Services.AddScoped<IAdminService, AdminService>();
+builder.Services.AddScoped<ITeacherService, TeacherService>();
 
 builder.Services.AddIdentityCore<ApplicationUser>(options =>
     {

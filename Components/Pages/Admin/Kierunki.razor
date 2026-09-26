@@ -1,7 +1,177 @@
 @page "/admin/kierunki"
+@using System.ComponentModel.DataAnnotations
 @using Microsoft.AspNetCore.Authorization
+@using wirtualny_dziekanat.Data.Entities
+@using wirtualny_dziekanat.Services
 @attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+
+@inject IAdminService AdminService
 
 <PageTitle>Kierunki</PageTitle>
-<h1>Kierunki</h1>
-<p>W tym miejscu znajdzie się zarządzanie kierunkami.</p>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="mb-1">Kierunki studiów</h1>
+        <p class="text-muted mb-0">Zarządzaj kierunkami dostępnymi w dziekanacie.</p>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+}
+
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <h2 class="h5 card-title">Dodaj nowy kierunek</h2>
+
+        <EditForm Model="newDirection" OnValidSubmit="AddKierunekAsync">
+            <DataAnnotationsValidator />
+            <ValidationSummary class="text-danger" />
+
+            <div class="row g-3 align-items-end">
+                <div class="col-md-8">
+                    <label for="directionName" class="form-label">Nazwa kierunku</label>
+                    <InputText id="directionName"
+                               class="form-control"
+                               @bind-Value="newDirection.Nazwa"
+                               placeholder="np. Informatyka" />
+                    <ValidationMessage For="@(() => newDirection.Nazwa)" class="text-danger" />
+                </div>
+                <div class="col-md-4">
+                    <button type="submit" class="btn btn-primary" disabled="@isSaving">
+                        <span class="bi bi-plus-circle me-1" aria-hidden="true"></span>
+                        @(isSaving ? "Zapisywanie..." : "Dodaj kierunek")
+                    </button>
+                </div>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-body">
+        <h2 class="h5 card-title">Lista kierunków</h2>
+
+        @if (isLoading)
+        {
+            <p class="text-muted mb-0">Ładowanie kierunków...</p>
+        }
+        else if (directions.Count == 0)
+        {
+            <p class="text-muted mb-0">Nie dodano jeszcze żadnego kierunku.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-striped table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th scope="col">Nazwa kierunku</th>
+                            <th scope="col" class="text-end">Akcje</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var direction in directions)
+                        {
+                            <tr @key="direction.Id">
+                                <td>@direction.Nazwa</td>
+                                <td class="text-end">
+                                    <button type="button"
+                                            class="btn btn-sm btn-danger"
+                                            disabled="@(isDeletingId is not null)"
+                                            @onclick="() => DeleteKierunekAsync(direction.Id)">
+                                        <span class="bi bi-trash me-1" aria-hidden="true"></span>
+                                        Usuń
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private List<Kierunek> directions = [];
+    private NewKierunekModel newDirection = new();
+    private bool isLoading = true;
+    private bool isSaving;
+    private int? isDeletingId;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadKierunkiAsync();
+    }
+
+    private async Task LoadKierunkiAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            directions = await AdminService.GetAllKierunkiAsync();
+        }
+        catch (Exception)
+        {
+            errorMessage = "Nie udało się pobrać listy kierunków.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task AddKierunekAsync()
+    {
+        isSaving = true;
+        errorMessage = null;
+
+        try
+        {
+            await AdminService.AddKierunekAsync(new Kierunek { Nazwa = newDirection.Nazwa });
+            newDirection = new NewKierunekModel();
+            await LoadKierunkiAsync();
+        }
+        catch (Exception)
+        {
+            errorMessage = "Nie udało się dodać kierunku.";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task DeleteKierunekAsync(int id)
+    {
+        isDeletingId = id;
+        errorMessage = null;
+
+        try
+        {
+            await AdminService.DeleteKierunekAsync(id);
+            await LoadKierunkiAsync();
+        }
+        catch (Exception)
+        {
+            errorMessage = "Nie udało się usunąć kierunku. Może być używany przez grupę lub studenta.";
+        }
+        finally
+        {
+            isDeletingId = null;
+        }
+    }
+
+    private sealed class NewKierunekModel
+    {
+        [Required(ErrorMessage = "Nazwa kierunku jest wymagana.")]
+        [StringLength(200, ErrorMessage = "Nazwa kierunku może mieć maksymalnie 200 znaków.")]
+        public string Nazwa { get; set; } = string.Empty;
+    }
+}

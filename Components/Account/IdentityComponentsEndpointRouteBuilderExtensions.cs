@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Primitives;
-using System.Security.Claims;
 using System.Text.Json;
 using wirtualny_dziekanat.Components.Account.Pages;
 using wirtualny_dziekanat.Components.Account.Pages.Manage;
@@ -42,12 +41,13 @@ namespace Microsoft.AspNetCore.Routing
             });
 
             accountGroup.MapPost("/Logout", async (
-                ClaimsPrincipal user,
                 [FromServices] SignInManager<ApplicationUser> signInManager,
-                [FromForm] string returnUrl) =>
+                [FromForm] string? returnUrl) =>
             {
                 await signInManager.SignOutAsync();
-                return TypedResults.LocalRedirect($"~/{returnUrl}");
+
+                var safeReturnUrl = IsLocalPath(returnUrl) ? returnUrl! : "/";
+                return TypedResults.LocalRedirect(safeReturnUrl);
             });
 
             accountGroup.MapPost("/PasskeyCreationOptions", async (
@@ -148,6 +148,15 @@ namespace Microsoft.AspNetCore.Routing
             });
 
             return accountGroup;
+        }
+
+        private static bool IsLocalPath(string? value)
+        {
+            return !string.IsNullOrWhiteSpace(value)
+                && value.StartsWith("/", StringComparison.Ordinal)
+                && !value.StartsWith("//", StringComparison.Ordinal)
+                && !value.StartsWith("/\\", StringComparison.Ordinal)
+                && !value.Contains('\\');
         }
     }
 }

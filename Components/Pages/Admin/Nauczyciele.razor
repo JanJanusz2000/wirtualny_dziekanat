@@ -1,0 +1,257 @@
+@page "/admin/nauczyciele"
+@using Microsoft.AspNetCore.Authorization
+@using wirtualny_dziekanat.Data.Entities
+@using wirtualny_dziekanat.Services
+@attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+
+@inject IAdminService AdminService
+
+<PageTitle>Nauczyciele</PageTitle>
+
+<div class="mb-4">
+    <p class="text-primary text-uppercase fw-semibold mb-1">Administracja</p>
+    <h1 class="display-6 fw-bold mb-1">Zarządzanie nauczycielami</h1>
+    <p class="text-muted mb-0">Twórz, edytuj i usuwaj profile oraz konta nauczycieli.</p>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+}
+
+@if (!string.IsNullOrWhiteSpace(successMessage))
+{
+    <div class="alert alert-success" role="alert">@successMessage</div>
+}
+
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="h5 mb-0">@(formModel.Id.HasValue ? $"Edytuj nauczyciela: {formModel.Imie} {formModel.Nazwisko}" : "Dodaj nowego nauczyciela")</h2>
+            @if (formModel.Id.HasValue)
+            {
+                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="CancelEdit">
+                    Anuluj edycję
+                </button>
+            }
+        </div>
+
+        <EditForm Model="formModel" OnValidSubmit="SaveTeacherAsync">
+            <DataAnnotationsValidator />
+            <ValidationSummary class="text-danger" />
+
+            <div class="row g-3 align-items-end">
+                <div class="col-md-6 col-lg-3">
+                    <label for="firstName" class="form-label">Imię</label>
+                    <InputText id="firstName" class="form-control" @bind-Value="formModel.Imie" />
+                    <ValidationMessage For="@(() => formModel.Imie)" class="text-danger" />
+                </div>
+                <div class="col-md-6 col-lg-3">
+                    <label for="lastName" class="form-label">Nazwisko</label>
+                    <InputText id="lastName" class="form-control" @bind-Value="formModel.Nazwisko" />
+                    <ValidationMessage For="@(() => formModel.Nazwisko)" class="text-danger" />
+                </div>
+                <div class="col-md-6 col-lg-3">
+                    <label for="title" class="form-label">Tytuł naukowy</label>
+                    <InputText id="title" class="form-control" @bind-Value="formModel.TytulNaukowy" placeholder="np. dr" />
+                    <ValidationMessage For="@(() => formModel.TytulNaukowy)" class="text-danger" />
+                </div>
+                <div class="col-md-6 col-lg-3">
+                    <label for="email" class="form-label">Email / login</label>
+                    <InputText id="email" type="email" class="form-control" @bind-Value="formModel.Email" autocomplete="username" />
+                    <ValidationMessage For="@(() => formModel.Email)" class="text-danger" />
+                </div>
+                <div class="col-md-6 col-lg-4">
+                    <label for="password" class="form-label">
+                        Hasło @(formModel.Id.HasValue ? "(opcjonalnie)" : "")
+                    </label>
+                    <InputText id="password" type="password" class="form-control" @bind-Value="formModel.Haslo" autocomplete="new-password" />
+                    <ValidationMessage For="@(() => formModel.Haslo)" class="text-danger" />
+                </div>
+                <div class="col-md-6 col-lg-8">
+                    <button type="submit" class="btn btn-primary me-2" disabled="@isSaving">
+                        @(isSaving ? "Zapisywanie..." : formModel.Id.HasValue ? "Zaktualizuj" : "Zapisz")
+                    </button>
+                    @if (formModel.Id.HasValue)
+                    {
+                        <button type="button" class="btn btn-outline-secondary" @onclick="CancelEdit" disabled="@isSaving">
+                            Anuluj
+                        </button>
+                    }
+                </div>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-body">
+        <h2 class="h5 mb-4">Lista nauczycieli</h2>
+
+        @if (isLoading)
+        {
+            <p class="text-muted mb-0">Ładowanie nauczycieli...</p>
+        }
+        else if (teachers.Count == 0)
+        {
+            <p class="text-muted mb-0">Nie ma jeszcze żadnych nauczycieli.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-striped table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Imię</th>
+                            <th>Nazwisko</th>
+                            <th>Tytuł naukowy</th>
+                            <th>Email</th>
+                            <th class="text-end">Akcje</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var teacher in teachers)
+                        {
+                            <tr @key="teacher.Id">
+                                <td>@teacher.Imie</td>
+                                <td>@teacher.Nazwisko</td>
+                                <td>@teacher.TytulNaukowy</td>
+                                <td>@teacher.ApplicationUser?.Email</td>
+                                <td class="text-end">
+                                    <button type="button" class="btn btn-sm btn-outline-primary me-1" @onclick="() => EditTeacherAsync(teacher.Id)">
+                                        Edytuj
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-danger" disabled="@(deletingId is not null)" @onclick="() => DeleteTeacherAsync(teacher.Id)">
+                                        Usuń
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private List<Teacher> teachers = [];
+    private TeacherFormViewModel formModel = new();
+    private bool isLoading = true;
+    private bool isSaving;
+    private int? deletingId;
+    private string? errorMessage;
+    private string? successMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTeachersAsync();
+    }
+
+    private async Task LoadTeachersAsync()
+    {
+        isLoading = true;
+
+        try
+        {
+            teachers = await AdminService.GetAllTeachersAsync();
+        }
+        catch (Exception exception)
+        {
+            errorMessage = GetErrorMessage(exception, "Nie udało się pobrać listy nauczycieli.");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task EditTeacherAsync(int teacherId)
+    {
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            var teacher = await AdminService.GetTeacherForEditAsync(teacherId);
+            if (teacher is null)
+            {
+                errorMessage = "Nie znaleziono nauczyciela.";
+                return;
+            }
+
+            formModel = teacher;
+        }
+        catch (Exception exception)
+        {
+            errorMessage = GetErrorMessage(exception, "Nie udało się pobrać danych nauczyciela.");
+        }
+    }
+
+    private async Task SaveTeacherAsync()
+    {
+        isSaving = true;
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            await AdminService.SaveTeacherAsync(formModel);
+            successMessage = formModel.Id.HasValue
+                ? "Dane nauczyciela zostały zaktualizowane."
+                : "Nauczyciel został utworzony.";
+            formModel = new TeacherFormViewModel();
+            await LoadTeachersAsync();
+        }
+        catch (Exception exception)
+        {
+            errorMessage = GetErrorMessage(exception, "Nie udało się zapisać nauczyciela.");
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task DeleteTeacherAsync(int teacherId)
+    {
+        deletingId = teacherId;
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            await AdminService.DeleteTeacherAsync(teacherId);
+            if (formModel.Id == teacherId)
+            {
+                formModel = new TeacherFormViewModel();
+            }
+
+            successMessage = "Nauczyciel został usunięty.";
+            await LoadTeachersAsync();
+        }
+        catch (Exception exception)
+        {
+            errorMessage = GetErrorMessage(exception, "Nie udało się usunąć nauczyciela. Może posiadać przypisane przedmioty.");
+        }
+        finally
+        {
+            deletingId = null;
+        }
+    }
+
+    private void CancelEdit()
+    {
+        formModel = new TeacherFormViewModel();
+        errorMessage = null;
+        successMessage = null;
+    }
+
+    private static string GetErrorMessage(Exception exception, string fallback)
+    {
+        return exception is InvalidOperationException
+            ? exception.Message
+            : fallback;
+    }
+}

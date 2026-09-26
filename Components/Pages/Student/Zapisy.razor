@@ -1,0 +1,163 @@
+@page "/student/zapisy"
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using wirtualny_dziekanat.Services
+@attribute [Authorize(Roles = "Student")]
+@rendermode InteractiveServer
+
+@inject IStudentService StudentService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Wybór przedmiotów</PageTitle>
+
+<div class="mb-4">
+    <p class="text-primary text-uppercase fw-semibold mb-1">Strefa studenta</p>
+    <h1 class="display-6 fw-bold mb-1">Wybór przedmiotów</h1>
+    <p class="text-muted mb-0">Zapisz się na przedmioty dostępne w ramach Twojego kierunku i aktualnego semestru.</p>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+}
+
+@if (!string.IsNullOrWhiteSpace(successMessage))
+{
+    <div class="alert alert-success" role="alert">@successMessage</div>
+}
+
+@if (isLoading)
+{
+    <div class="card border-0 shadow-sm"><div class="card-body text-muted">Ładowanie przedmiotów...</div></div>
+}
+else
+{
+    <div class="row g-4">
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <h2 class="h5 mb-4">Dostępne przedmioty</h2>
+                    @if (availableSubjects.Count == 0)
+                    {
+                        <p class="text-muted mb-0">Nie ma nowych przedmiotów do wyboru.</p>
+                    }
+                    else
+                    {
+                        <div class="list-group list-group-flush">
+                            @foreach (var subject in availableSubjects)
+                            {
+                                <div class="list-group-item px-0 d-flex justify-content-between align-items-center gap-3">
+                                    <div>
+                                        <div class="fw-semibold">@subject.Nazwa</div>
+                                        <small class="text-muted">Semestr @subject.Semestr · @subject.PunktyECTS ECTS</small>
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-success" disabled="@(enrollingSubjectId is not null)" @onclick="() => EnrollAsync(subject.Id)">
+                                        @(enrollingSubjectId == subject.Id ? "Zapisywanie..." : "Zapisz się")
+                                    </button>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <h2 class="h5 mb-4">Twoje przedmioty</h2>
+                    @if (mySubjects.Count == 0)
+                    {
+                        <p class="text-muted mb-0">Nie jesteś jeszcze zapisany na żaden przedmiot.</p>
+                    }
+                    else
+                    {
+                        <div class="list-group list-group-flush">
+                            @foreach (var subject in mySubjects)
+                            {
+                                <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                                    <span class="fw-semibold">@subject.Nazwa</span>
+                                    <span class="badge text-bg-secondary">Semestr @subject.Semestr · @subject.PunktyECTS ECTS</span>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<StudentSubjectDto> availableSubjects = [];
+    private List<StudentSubjectDto> mySubjects = [];
+    private string? userId;
+    private int? enrollingSubjectId;
+    private bool isLoading = true;
+    private string? errorMessage;
+    private string? successMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            userId = authenticationState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                errorMessage = "Nie można ustalić tożsamości zalogowanego studenta.";
+                return;
+            }
+
+            await LoadSubjectsAsync();
+        }
+        catch (Exception exception)
+        {
+            errorMessage = GetErrorMessage(exception, "Nie udało się pobrać przedmiotów.");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadSubjectsAsync()
+    {
+        var availableTask = StudentService.GetAvailableSubjectsAsync(userId!);
+        var mineTask = StudentService.GetMySubjectsAsync(userId!);
+        await Task.WhenAll(availableTask, mineTask);
+        availableSubjects = (await availableTask).ToList();
+        mySubjects = (await mineTask).ToList();
+    }
+
+    private async Task EnrollAsync(int subjectId)
+    {
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            errorMessage = "Nie można ustalić tożsamości studenta.";
+            return;
+        }
+
+        enrollingSubjectId = subjectId;
+        errorMessage = null;
+        successMessage = null;
+        try
+        {
+            await StudentService.EnrollInSubjectAsync(userId, subjectId);
+            await LoadSubjectsAsync();
+            successMessage = "Zostałeś zapisany na przedmiot.";
+        }
+        catch (Exception exception)
+        {
+            errorMessage = GetErrorMessage(exception, "Nie udało się zapisać na przedmiot.");
+        }
+        finally
+        {
+            enrollingSubjectId = null;
+        }
+    }
+
+    private static string GetErrorMessage(Exception exception, string fallback) =>
+        exception is InvalidOperationException ? exception.Message : fallback;
+}

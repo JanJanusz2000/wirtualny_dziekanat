@@ -1,7 +1,103 @@
 @page "/student/oceny"
+@using System.Security.Claims
 @using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using wirtualny_dziekanat.Services
 @attribute [Authorize(Roles = "Student")]
+@rendermode InteractiveServer
+
+@inject IStudentService StudentService
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
 <PageTitle>Oceny</PageTitle>
-<h1>Oceny</h1>
-<p>W tym miejscu znajdzie się lista ocen studenta.</p>
+
+<div class="mb-4">
+    <p class="text-primary text-uppercase fw-semibold mb-1">Strefa studenta</p>
+    <h1 class="display-6 fw-bold mb-1">Moje oceny</h1>
+    <p class="text-muted mb-0">Lista przedmiotów i ocen wystawionych przez prowadzących.</p>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+}
+
+<div class="card border-0 shadow-sm">
+    <div class="card-body">
+        @if (isLoading)
+        {
+            <p class="text-muted mb-0">Ładowanie ocen...</p>
+        }
+        else if (grades.Count == 0)
+        {
+            <p class="text-muted mb-0">Nie masz jeszcze zapisów na żadne przedmioty.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-striped table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Nazwa przedmiotu</th>
+                            <th>Punkty ECTS</th>
+                            <th>Prowadzący</th>
+                            <th>Wystawiona ocena</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var grade in grades)
+                        {
+                            <tr @key="grade.EnrollmentId">
+                                <td>@grade.SubjectName</td>
+                                <td>@grade.PunktyECTS</td>
+                                <td>@grade.TeacherFirstName @grade.TeacherLastName</td>
+                                <td>
+                                    @if (grade.WartoscOceny.HasValue)
+                                    {
+                                        @grade.WartoscOceny.Value.ToString("0.0")
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">Brak oceny</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private List<StudentGradeInfoDto> grades = [];
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var userId = authenticationState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                errorMessage = "Nie można ustalić tożsamości zalogowanego studenta.";
+                return;
+            }
+
+            grades = (await StudentService.GetMyGradesAsync(userId)).ToList();
+        }
+        catch (Exception exception)
+        {
+            errorMessage = exception is InvalidOperationException
+                ? exception.Message
+                : "Nie udało się pobrać ocen.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

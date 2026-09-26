@@ -1,0 +1,10 @@
+@page "/admin/dashboard"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Admin")]
+
+<PageTitle>Panel Admina</PageTitle>
+
+<div class="p-5 mb-4 bg-primary text-white rounded-3 shadow-sm">
+    <h1 class="display-6">Panel administratora</h1>
+    <p class="lead mb-0">Zarządzaj podstawowymi danymi Wirtualnego Dziekanatu.</p>
+</div>

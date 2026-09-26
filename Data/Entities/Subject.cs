@@ -9,9 +9,17 @@ public class Subject
     [Required, StringLength(200)]
     public string Nazwa { get; set; } = string.Empty;
 
+    [Range(1, 30)]
+    public int PunktyECTS { get; set; }
+
+    [Range(1, 20)]
+    public int Semestr { get; set; } = 1;
+
     public int TeacherId { get; set; }
+    public int KierunekId { get; set; }
 
     public Teacher Teacher { get; set; } = null!;
+    public Kierunek Kierunek { get; set; } = null!;
     public ICollection<Enrollment> Enrollments { get; set; } = new List<Enrollment>();
     public ICollection<Schedule> Schedules { get; set; } = new List<Schedule>();
 }

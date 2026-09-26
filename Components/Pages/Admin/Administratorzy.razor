@@ -1,0 +1,156 @@
+@page "/admin/administratorzy"
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Authorization
+@using wirtualny_dziekanat.Data
+@using wirtualny_dziekanat.Services
+@attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+
+@inject IAdminService AdminService
+
+<PageTitle>Administratorzy</PageTitle>
+
+<div class="mb-4">
+    <p class="text-primary text-uppercase fw-semibold mb-1">Administracja</p>
+    <h1 class="display-6 fw-bold mb-1">Administratorzy</h1>
+    <p class="text-muted mb-0">Zarządzaj kontami użytkowników z rolą Admin.</p>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+}
+
+@if (!string.IsNullOrWhiteSpace(successMessage))
+{
+    <div class="alert alert-success" role="alert">@successMessage</div>
+}
+
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <h2 class="h5 mb-4">Dodaj administratora</h2>
+        <EditForm Model="formModel" OnValidSubmit="CreateAdminAsync">
+            <DataAnnotationsValidator />
+            <ValidationSummary class="text-danger" />
+            <div class="row g-3 align-items-end">
+                <div class="col-md-5">
+                    <label for="adminEmail" class="form-label">Email</label>
+                    <InputText id="adminEmail" type="email" class="form-control" @bind-Value="formModel.Email" autocomplete="username" />
+                    <ValidationMessage For="@(() => formModel.Email)" class="text-danger" />
+                </div>
+                <div class="col-md-5">
+                    <label for="adminPassword" class="form-label">Hasło</label>
+                    <InputText id="adminPassword" type="password" class="form-control" @bind-Value="formModel.Password" autocomplete="new-password" />
+                    <ValidationMessage For="@(() => formModel.Password)" class="text-danger" />
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">Dodaj administratora</button>
+                </div>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-body">
+        <h2 class="h5 mb-3">Lista administratorów</h2>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Adres e-mail</th>
+                        <th>Akcje</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var admin in admins)
+                    {
+                        var isMainAdmin = string.Equals(admin.Email, MainAdminEmail, StringComparison.OrdinalIgnoreCase);
+                        <tr>
+                            <td>@admin.Email</td>
+                            <td>
+                                @if (isMainAdmin)
+                                {
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" disabled>Usuń</button>
+                                }
+                                else
+                                {
+                                    <button type="button" class="btn btn-outline-danger btn-sm" @onclick="() => DeleteAdminAsync(admin.Id)">Usuń</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@code {
+    private const string MainAdminEmail = "admin@uczelnia.pl";
+    private readonly AdminFormModel formModel = new();
+    private List<ApplicationUser> admins = [];
+    private string? errorMessage;
+    private string? successMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAdminsAsync();
+    }
+
+    private async Task LoadAdminsAsync()
+    {
+        admins = await AdminService.GetAllAdminsAsync();
+    }
+
+    private async Task CreateAdminAsync()
+    {
+        ClearMessages();
+
+        try
+        {
+            await AdminService.CreateAdminAsync(formModel.Email, formModel.Password);
+            formModel.Email = string.Empty;
+            formModel.Password = string.Empty;
+            await LoadAdminsAsync();
+            successMessage = "Administrator został dodany.";
+        }
+        catch (Exception exception)
+        {
+            errorMessage = exception.Message;
+        }
+    }
+
+    private async Task DeleteAdminAsync(string userId)
+    {
+        ClearMessages();
+
+        try
+        {
+            await AdminService.DeleteAdminAsync(userId);
+            await LoadAdminsAsync();
+            successMessage = "Administrator został usunięty.";
+        }
+        catch (Exception exception)
+        {
+            errorMessage = exception.Message;
+        }
+    }
+
+    private void ClearMessages()
+    {
+        errorMessage = null;
+        successMessage = null;
+    }
+
+    private sealed class AdminFormModel
+    {
+        [Required(ErrorMessage = "Email jest wymagany.")]
+        [EmailAddress(ErrorMessage = "Podaj poprawny adres email.")]
+        public string Email { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Hasło jest wymagane.")]
+        [MinLength(6, ErrorMessage = "Hasło musi mieć co najmniej 6 znaków.")]
+        public string Password { get; set; } = string.Empty;
+    }
+}

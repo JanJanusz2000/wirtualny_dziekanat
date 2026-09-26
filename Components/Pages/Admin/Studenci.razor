@@ -1,7 +1,300 @@
 @page "/admin/studenci"
 @using Microsoft.AspNetCore.Authorization
+@using wirtualny_dziekanat.Data.Entities
+@using wirtualny_dziekanat.Services
 @attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+
+@inject IAdminService AdminService
 
 <PageTitle>Studenci</PageTitle>
-<h1>Studenci</h1>
-<p>W tym miejscu znajdzie się zarządzanie studentami.</p>
+
+<div class="mb-4">
+    <p class="text-primary text-uppercase fw-semibold mb-1">Administracja</p>
+    <h1 class="display-6 fw-bold mb-1">Zarządzanie studentami</h1>
+    <p class="text-muted mb-0">Twórz, edytuj i usuwaj profile oraz konta studentów.</p>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+}
+
+@if (!string.IsNullOrWhiteSpace(successMessage))
+{
+    <div class="alert alert-success" role="alert">@successMessage</div>
+}
+
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="h5 mb-0">@(formModel.Id.HasValue ? $"Edytuj studenta: {formModel.Imie} {formModel.Nazwisko}" : "Dodaj nowego studenta")</h2>
+            @if (formModel.Id.HasValue)
+            {
+                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="CancelEdit">Anuluj edycję</button>
+            }
+        </div>
+
+        <EditForm Model="formModel" OnValidSubmit="SaveStudentAsync">
+            <DataAnnotationsValidator />
+            <ValidationSummary class="text-danger" />
+
+            <div class="row g-3 align-items-end">
+                <div class="col-md-6 col-lg-3">
+                    <label for="firstName" class="form-label">Imię</label>
+                    <InputText id="firstName" class="form-control" @bind-Value="formModel.Imie" />
+                    <ValidationMessage For="@(() => formModel.Imie)" class="text-danger" />
+                </div>
+                <div class="col-md-6 col-lg-3">
+                    <label for="lastName" class="form-label">Nazwisko</label>
+                    <InputText id="lastName" class="form-control" @bind-Value="formModel.Nazwisko" />
+                    <ValidationMessage For="@(() => formModel.Nazwisko)" class="text-danger" />
+                </div>
+                <div class="col-md-6 col-lg-3">
+                    <label for="indexNumber" class="form-label">Numer indeksu</label>
+                    <InputText id="indexNumber" class="form-control" @bind-Value="formModel.NumerIndeksu" />
+                    <ValidationMessage For="@(() => formModel.NumerIndeksu)" class="text-danger" />
+                </div>
+                <div class="col-md-6 col-lg-3">
+                    <label for="email" class="form-label">Email / login</label>
+                    <InputText id="email" type="email" class="form-control" @bind-Value="formModel.Email" autocomplete="username" />
+                    <ValidationMessage For="@(() => formModel.Email)" class="text-danger" />
+                </div>
+                <div class="col-md-6 col-lg-3">
+                    <label for="password" class="form-label">Hasło @(formModel.Id.HasValue ? "(opcjonalnie)" : "")</label>
+                    <InputText id="password" type="password" class="form-control" @bind-Value="formModel.Haslo" autocomplete="new-password" />
+                    <ValidationMessage For="@(() => formModel.Haslo)" class="text-danger" />
+                </div>
+                <div class="col-md-6 col-lg-3">
+                    <label for="direction" class="form-label">Kierunek</label>
+                    <InputSelect id="direction" class="form-select" @bind-Value="formModel.KierunekId">
+                        <option value="0">-- wybierz kierunek --</option>
+                        @foreach (var direction in directions)
+                        {
+                            <option value="@direction.Id">@direction.Nazwa</option>
+                        }
+                    </InputSelect>
+                    <ValidationMessage For="@(() => formModel.KierunekId)" class="text-danger" />
+                </div>
+                <div class="col-md-6 col-lg-3">
+                    <label for="studyMode" class="form-label">Tryb studiów</label>
+                    <InputSelect id="studyMode" class="form-select" @bind-Value="formModel.TrybStudiow">
+                        <option value="Dzienne">Dzienne</option>
+                        <option value="Zaoczne">Zaoczne</option>
+                    </InputSelect>
+                    <ValidationMessage For="@(() => formModel.TrybStudiow)" class="text-danger" />
+                </div>
+                <div class="col-md-6 col-lg-3">
+                    <label for="currentSemester" class="form-label">Aktualny semestr</label>
+                    <InputNumber id="currentSemester" class="form-control" @bind-Value="formModel.AktualnySemestr" />
+                    <ValidationMessage For="@(() => formModel.AktualnySemestr)" class="text-danger" />
+                </div>
+                <div class="col-md-6 col-lg-3">
+                    <div class="form-check mb-2">
+                        <InputCheckbox id="tuitionPaid" class="form-check-input" @bind-Value="formModel.CzyCzesneOplacone" />
+                        <label for="tuitionPaid" class="form-check-label">Czesne opłacone</label>
+                    </div>
+                </div>
+                <div class="col-12">
+                    <button type="submit" class="btn btn-primary me-2" disabled="@isSaving">
+                        @(isSaving ? "Zapisywanie..." : formModel.Id.HasValue ? "Zaktualizuj" : "Zapisz")
+                    </button>
+                    @if (formModel.Id.HasValue)
+                    {
+                        <button type="button" class="btn btn-outline-secondary" @onclick="CancelEdit" disabled="@isSaving">Anuluj</button>
+                    }
+                </div>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-body">
+        <h2 class="h5 mb-4">Lista studentów</h2>
+        @if (isLoading)
+        {
+            <p class="text-muted mb-0">Ładowanie studentów...</p>
+        }
+        else if (students.Count == 0)
+        {
+            <p class="text-muted mb-0">Nie ma jeszcze żadnych studentów.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-striped table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Imię</th>
+                            <th>Nazwisko</th>
+                            <th>Numer indeksu</th>
+                            <th>Email</th>
+                            <th>Kierunek</th>
+                            <th>Aktualny semestr</th>
+                            <th class="text-end">Akcje</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var student in students)
+                        {
+                            <tr @key="student.Id">
+                                <td>@student.Imie</td>
+                                <td>@student.Nazwisko</td>
+                                <td>@student.NumerIndeksu</td>
+                                <td>@student.ApplicationUser?.Email</td>
+                                <td>@student.Kierunek?.Nazwa</td>
+                                <td>@student.AktualnySemestr</td>
+                                <td class="text-end">
+                                    <button type="button" class="btn btn-sm btn-outline-primary me-1" @onclick="() => EditStudentAsync(student.Id)">Edytuj</button>
+                                    <button type="button" class="btn btn-sm btn-outline-success me-1" disabled="@(enrollingStudentId is not null)" @onclick="() => AutoEnrollStudentAsync(student.Id)">
+                                        @(enrollingStudentId == student.Id ? "Przypisywanie..." : "Przypisz przedmioty")
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-danger" disabled="@(deletingId is not null)" @onclick="() => DeleteStudentAsync(student.Id)">Usuń</button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private List<Student> students = [];
+    private List<Kierunek> directions = [];
+    private StudentFormViewModel formModel = new();
+    private bool isLoading = true;
+    private bool isSaving;
+    private int? deletingId;
+    private int? enrollingStudentId;
+    private string? errorMessage;
+    private string? successMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        isLoading = true;
+        try
+        {
+            var studentsTask = AdminService.GetAllStudentsAsync();
+            var directionsTask = AdminService.GetAllKierunkiAsync();
+            await Task.WhenAll(studentsTask, directionsTask);
+            students = (await studentsTask).ToList();
+            directions = await directionsTask;
+        }
+        catch (Exception exception)
+        {
+            errorMessage = GetErrorMessage(exception, "Nie udało się pobrać danych studentów.");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task EditStudentAsync(int studentId)
+    {
+        errorMessage = null;
+        successMessage = null;
+        try
+        {
+            var student = await AdminService.GetStudentForEditAsync(studentId);
+            if (student is null)
+            {
+                errorMessage = "Nie znaleziono studenta.";
+                return;
+            }
+
+            formModel = student;
+        }
+        catch (Exception exception)
+        {
+            errorMessage = GetErrorMessage(exception, "Nie udało się pobrać danych studenta.");
+        }
+    }
+
+    private async Task SaveStudentAsync()
+    {
+        isSaving = true;
+        errorMessage = null;
+        successMessage = null;
+        try
+        {
+            await AdminService.SaveStudentAsync(formModel);
+            successMessage = formModel.Id.HasValue ? "Dane studenta zostały zaktualizowane." : "Student został utworzony.";
+            formModel = new StudentFormViewModel();
+            await LoadDataAsync();
+        }
+        catch (Exception exception)
+        {
+            errorMessage = GetErrorMessage(exception, "Nie udało się zapisać studenta.");
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task DeleteStudentAsync(int studentId)
+    {
+        deletingId = studentId;
+        errorMessage = null;
+        successMessage = null;
+        try
+        {
+            await AdminService.DeleteStudentAsync(studentId);
+            if (formModel.Id == studentId)
+            {
+                formModel = new StudentFormViewModel();
+            }
+
+            successMessage = "Student został usunięty.";
+            await LoadDataAsync();
+        }
+        catch (Exception exception)
+        {
+            errorMessage = GetErrorMessage(exception, "Nie udało się usunąć studenta. Może posiadać powiązane dane.");
+        }
+        finally
+        {
+            deletingId = null;
+        }
+    }
+
+    private async Task AutoEnrollStudentAsync(int studentId)
+    {
+        enrollingStudentId = studentId;
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            await AdminService.AutoEnrollStudentAsync(studentId);
+            successMessage = "Przedmioty studenta zostały zaktualizowane.";
+        }
+        catch (Exception exception)
+        {
+            errorMessage = GetErrorMessage(exception, "Nie udało się przypisać przedmiotów studentowi.");
+        }
+        finally
+        {
+            enrollingStudentId = null;
+        }
+    }
+
+    private void CancelEdit()
+    {
+        formModel = new StudentFormViewModel();
+        errorMessage = null;
+        successMessage = null;
+    }
+
+    private static string GetErrorMessage(Exception exception, string fallback) =>
+        exception is InvalidOperationException ? exception.Message : fallback;
+}

@@ -44,9 +44,10 @@ public static class DbInitializer
             await context.SaveChangesAsync();
         }
 
-        await GetOrCreateUserAsync(userManager, "admin@dziekanat.local", "Admin123!", "Admin");
+        await GetOrCreateUserAsync(userManager, "admin@uczelnia.pl", "Admin123!", "Admin");
         var student = await GetOrCreateUserAsync(userManager, "student@dziekanat.local", "Student123!", "Student");
         var teacher = await GetOrCreateUserAsync(userManager, "teacher@dziekanat.local", "Teacher123!", "Teacher");
+        var janKowalski = await GetOrCreateUserAsync(userManager, "jan.kowalski@uczelnia.pl", "Jan123!", "Teacher");
 
         if (!await context.Students.AnyAsync(item => item.ApplicationUserId == student.Id))
         {
@@ -73,7 +74,102 @@ public static class DbInitializer
             });
         }
 
+        if (!await context.Teachers.AnyAsync(item => item.ApplicationUserId == janKowalski.Id))
+        {
+            context.Teachers.Add(new Teacher
+            {
+                ApplicationUserId = janKowalski.Id,
+                Imie = "Jan",
+                Nazwisko = "Kowalski",
+                TytulNaukowy = "dr"
+            });
+        }
+
         await context.SaveChangesAsync();
+
+        var janProfile = await context.Teachers
+            .SingleAsync(item => item.ApplicationUserId == janKowalski.Id);
+
+        await SeedSubjectAsync(
+            context,
+            janProfile.Id,
+            group.Id,
+            direction.Id,
+            "Bazy Danych",
+            5,
+            DayOfWeek.Monday,
+            new TimeOnly(8, 0),
+            new TimeOnly(9, 30),
+            "A-101");
+
+        await SeedSubjectAsync(
+            context,
+            janProfile.Id,
+            group.Id,
+            direction.Id,
+            "Programowanie Obiektowe",
+            6,
+            DayOfWeek.Wednesday,
+            new TimeOnly(10, 0),
+            new TimeOnly(11, 30),
+            "B-204");
+    }
+
+    private static async Task SeedSubjectAsync(
+        ApplicationDbContext context,
+        int teacherId,
+        int groupId,
+        int directionId,
+        string name,
+        int ects,
+        DayOfWeek day,
+        TimeOnly start,
+        TimeOnly end,
+        string room)
+    {
+        var subject = await context.Subjects
+            .SingleOrDefaultAsync(item => item.Nazwa == name);
+
+        if (subject is null)
+        {
+            subject = new Subject
+            {
+                Nazwa = name,
+                TeacherId = teacherId,
+                KierunekId = directionId,
+                PunktyECTS = ects
+            };
+            context.Subjects.Add(subject);
+            await context.SaveChangesAsync();
+        }
+        else
+        {
+            if (subject.KierunekId == 0)
+            {
+                subject.KierunekId = directionId;
+            }
+
+            if (subject.PunktyECTS == 0)
+            {
+                subject.PunktyECTS = ects;
+            }
+
+            await context.SaveChangesAsync();
+        }
+
+        if (!await context.Schedules.AnyAsync(item => item.SubjectId == subject.Id && item.GrupaId == groupId))
+        {
+            context.Schedules.Add(new Schedule
+            {
+                GrupaId = groupId,
+                SubjectId = subject.Id,
+                DzienTygodnia = day,
+                GodzinaRozpoczecia = start,
+                GodzinaZakonczenia = end,
+                Sala = room
+            });
+            await context.SaveChangesAsync();
+        }
     }
 
     private static async Task<ApplicationUser> GetOrCreateUserAsync(
